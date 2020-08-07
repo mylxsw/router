@@ -15,7 +15,7 @@ func main() {
 	router := web.NewRouter(cc, web.DefaultConfig(), mw.AccessLog())
 
 	router.Get("/", func(ctx web.Context) web.Response {
-		return ctx.NewAPIResponse("000000", "ok", web.M{
+		return ctx.API("000000", "ok", web.M{
 			"id": 12445,
 		})
 	})

@@ -29,21 +29,20 @@ type Route interface {
 
 type Context interface {
 	JSON(res interface{}) *JSONResponse
-	NewJSONResponse(res interface{}) *JSONResponse
-	YAML(res interface{}) *YAMLResponse
-	NewYAMLResponse(res interface{}) *YAMLResponse
 	JSONWithCode(res interface{}, code int) *JSONResponse
-	Nil() *NilResponse
 	API(businessCode string, message string, data interface{}) *JSONResponse
-	NewAPIResponse(businessCode string, message string, data interface{}) *JSONResponse
-	NewRawResponse() *RawResponse
-	NewHTMLResponse(res string) *HTMLResponse
+	JSONError(res string, code int) *JSONResponse
+
+	YAML(res interface{}) *YAMLResponse
+	Nil() *NilResponse
+	Plain() *RawResponse
+
 	HTML(res string) *HTMLResponse
 	HTMLWithCode(res string, code int) *HTMLResponse
+
 	Error(res string, code int) *ErrorResponse
-	JSONError(res string, code int) *JSONResponse
-	NewErrorResponse(res string, code int) *ErrorResponse
 	Redirect(location string, code int) *RedirectResponse
+
 	Decode(v interface{}) error
 	Unmarshal(v interface{}) error
 	UnmarshalYAML(v interface{}) error

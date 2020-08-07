@@ -210,11 +210,11 @@ func (router *Router) parseResponse(ctx Context, results []interface{}) Response
 	case Response:
 		return results[0].(Response)
 	case string:
-		return ctx.NewHTMLResponse(results[0].(string))
+		return ctx.HTML(results[0].(string))
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return ctx.NewHTMLResponse(fmt.Sprintf("%d", results[0]))
+		return ctx.HTML(fmt.Sprintf("%d", results[0]))
 	case float32, float64:
-		return ctx.NewHTMLResponse(fmt.Sprintf("%f", results[0]))
+		return ctx.HTML(fmt.Sprintf("%f", results[0]))
 	case error:
 		if results[0] == nil {
 			return ctx.HTML("")
@@ -223,9 +223,9 @@ func (router *Router) parseResponse(ctx Context, results []interface{}) Response
 		panic(results[0])
 	default:
 		if jsonAble, ok := results[0].(JSONAble); ok {
-			return ctx.NewJSONResponse(jsonAble.ToJSON())
+			return ctx.JSON(jsonAble.ToJSON())
 		}
 
-		return ctx.NewJSONResponse(results[0])
+		return ctx.JSON(results[0])
 	}
 }

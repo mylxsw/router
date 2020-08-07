@@ -23,18 +23,10 @@ func NewWebContext(router *Router, pathVars map[string]string, writer http.Respo
 }
 
 func (w *webContext) JSON(res interface{}) *JSONResponse {
-	return w.NewJSONResponse(res)
-}
-
-func (w *webContext) NewJSONResponse(res interface{}) *JSONResponse {
 	return NewJSONResponse(w.responsor, http.StatusOK, res)
 }
 
 func (w *webContext) YAML(res interface{}) *YAMLResponse {
-	return w.NewYAMLResponse(res)
-}
-
-func (w *webContext) NewYAMLResponse(res interface{}) *YAMLResponse {
 	return NewYAMLResponse(w.responsor, http.StatusOK, res)
 }
 
@@ -47,11 +39,7 @@ func (w *webContext) Nil() *NilResponse {
 }
 
 func (w *webContext) API(businessCode string, message string, data interface{}) *JSONResponse {
-	return w.NewAPIResponse(businessCode, message, data)
-}
-
-func (w *webContext) NewAPIResponse(businessCode string, message string, data interface{}) *JSONResponse {
-	return w.NewJSONResponse(struct {
+	return w.JSON(struct {
 		Code    string      `json:"code"`
 		Message string      `json:"message"`
 		Data    interface{} `json:"data"`
@@ -62,16 +50,12 @@ func (w *webContext) NewAPIResponse(businessCode string, message string, data in
 	})
 }
 
-func (w *webContext) NewRawResponse() *RawResponse {
+func (w *webContext) Plain() *RawResponse {
 	return NewRawResponse(w.responsor)
 }
 
-func (w *webContext) NewHTMLResponse(res string) *HTMLResponse {
-	return NewHTMLResponse(w.responsor, http.StatusOK, res)
-}
-
 func (w *webContext) HTML(res string) *HTMLResponse {
-	return w.NewHTMLResponse(res)
+	return NewHTMLResponse(w.responsor, http.StatusOK, res)
 }
 
 func (w *webContext) HTMLWithCode(res string, code int) *HTMLResponse {
@@ -79,15 +63,11 @@ func (w *webContext) HTMLWithCode(res string, code int) *HTMLResponse {
 }
 
 func (w *webContext) Error(res string, code int) *ErrorResponse {
-	return w.NewErrorResponse(res, code)
+	return NewErrorResponse(w.responsor, res, code)
 }
 
 func (w *webContext) JSONError(res string, code int) *JSONResponse {
 	return w.JSONWithCode(M{"error": res}, code)
-}
-
-func (w *webContext) NewErrorResponse(res string, code int) *ErrorResponse {
-	return NewErrorResponse(w.responsor, res, code)
 }
 
 func (w *webContext) Redirect(location string, code int) *RedirectResponse {
