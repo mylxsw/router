@@ -14,6 +14,7 @@ type webContext struct {
 	conf      *Config
 }
 
+// NewWebContext create new WebContext
 func NewWebContext(router *Router, pathVars map[string]string, writer http.ResponseWriter, request *http.Request) Context {
 	return &webContext{
 		cc:        router.cc,

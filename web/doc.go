@@ -7,6 +7,12 @@ import (
 	"github.com/mylxsw/container"
 )
 
+// Log is a interface for logger
+type Log interface {
+	Debugf(format string, v ...interface{})
+	Errorf(format string, v ...interface{})
+}
+
 type Route interface {
 	Match(r2 RealRoute) (bool, map[string]string)
 

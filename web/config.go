@@ -1,5 +1,6 @@
 package web
 
+// Config is a object for web server configuration
 type Config struct {
 	MultipartFormMaxMemory int64  // Multipart-form 解析占用最大内存
 	TempDir                string // 临时目录，用于上传文件等

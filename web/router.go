@@ -2,7 +2,7 @@ package web
 
 import (
 	"fmt"
-	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,9 +18,19 @@ type Router struct {
 	routesByMethod map[string][]Route
 	conf           *Config
 
-	decorators []HandlerDecorator
+	decorators           []HandlerDecorator
+	exceptionHandler     ExceptionHandler
+	routeNotFoundHandler RouteNotFoundHandler
+	logger               Log
 }
 
+// ExceptionHandler is a function interface for exception handler
+type ExceptionHandler func(wtx Context, err error) Response
+
+// RouteNotFoundHandler ias a function interface for route not found handler
+type RouteNotFoundHandler func(wtx Context, route RealRoute) Response
+
+// NewRouter create a new Router
 func NewRouter(cc container.Container, conf *Config, decors ...HandlerDecorator) *Router {
 	ccc := container.Extend(cc)
 	ccc.MustSingleton(func() Decoder {
@@ -41,6 +51,47 @@ func createRouter(cc container.Container, conf *Config, decors ...HandlerDecorat
 	}
 }
 
+// WithExceptionHandler set a exception handler function
+func (router *Router) WithExceptionHandler(fn ExceptionHandler) *Router {
+	router.exceptionHandler = fn
+	return router
+}
+
+// WithRouteNotFoundHandler set a route not found handler function
+func (router *Router) WithRouteNotFoundHandler(fn RouteNotFoundHandler) *Router {
+	router.routeNotFoundHandler = fn
+	return router
+}
+
+// WithLogger set a logger for router
+func (router *Router) WithLogger(logger Log) *Router {
+	router.logger = logger
+	return router
+}
+
+// Serve accepts incoming connections on the Listener l
+func (router *Router) Serve(l net.Listener) error {
+	return http.Serve(l, router)
+}
+
+// ServeTLS accepts incoming connections on the Listener l
+func (router *Router) ServeTLS(l net.Listener, certFile, keyFile string) error {
+	return http.ServeTLS(l, router, certFile, keyFile)
+}
+
+// ListenAndServe listens on the TCP network address addr and then calls
+// Serve with router to handle requests on incoming connections.
+func (router *Router) ListenAndServe(addr string) error {
+	return http.ListenAndServe(addr, router)
+}
+
+// ListenAndServeTLS acts identically to ListenAndServe, except that it
+// expects HTTPS connections.
+func (router *Router) ListenAndServeTLS(addr, certFile, keyFile string) error {
+	return http.ListenAndServeTLS(addr, certFile, keyFile, router)
+}
+
+// Group create a router group
 func (router *Router) Group(prefix string, f func(router *Router), decors ...HandlerDecorator) {
 	groupRouter := createRouter(router.cc, router.conf, decors...)
 	f(groupRouter)
@@ -122,6 +173,7 @@ func (router *Router) AddRoute(route Route) {
 	}
 }
 
+// Routes return all routes as a slice
 func (router *Router) Routes() []Route {
 	router.lock.RLock()
 	defer router.lock.RUnlock()
@@ -145,19 +197,30 @@ func (router *Router) Match(current RealRoute) (Route, map[string]string) {
 	return nil, nil
 }
 
-func (router *Router) notFoundHandler(writer http.ResponseWriter, request *http.Request) {
-	writer.WriteHeader(http.StatusNotFound)
-	_, _ = writer.Write([]byte("Not Found"))
+func (router *Router) handleRouteNotFound(wtx Context, route RealRoute) {
+	if router.routeNotFoundHandler == nil {
+		_ = wtx.HTMLWithCode("Not Found", http.StatusNotFound).Send()
+		return
+	}
+
+	if resp := router.routeNotFoundHandler(wtx, route); resp != nil {
+		_ = resp.Send()
+	}
 }
 
-func (router *Router) exceptionHandler(ctx Context, err error) Response {
-	return NewErrorResponse(ctx.Response(), err.Error(), http.StatusInternalServerError)
+func (router *Router) handleException(wtx Context, err error) Response {
+	if router.exceptionHandler == nil {
+		return NewErrorResponse(wtx.Response(), err.Error(), http.StatusInternalServerError)
+	}
+
+	return router.exceptionHandler(wtx, err)
 }
 
 func (router *Router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	matchedRoute, pathVars := router.Match(NewRealRoute(request))
+	realRoute := NewRealRoute(request)
+	matchedRoute, pathVars := router.Match(realRoute)
 	if matchedRoute == nil {
-		router.notFoundHandler(writer, request)
+		router.handleRouteNotFound(NewWebContext(router, nil, writer, request), realRoute)
 		return
 	}
 
@@ -167,16 +230,28 @@ func (router *Router) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 func (router *Router) handle(ctx Context, matchedRoute Route) {
 
-	handler := func(ctx Context) Response {
+	handler := func(ctx Context) (resp Response) {
 		ctxCB := func() Context { return ctx }
 		reqCB := func() Request { return ctx.Request() }
 		respCB := func() Responsor { return ctx.Response() }
 		matchedRouteCB := func() Route { return matchedRoute }
 
 		provider, _ := router.cc.Provider(ctxCB, reqCB, respCB, matchedRouteCB)
+
+		defer func() {
+			if err := recover(); err != nil {
+				switch err.(type) {
+				case error:
+					resp = router.handleException(ctx, err.(error))
+				default:
+					resp = router.handleException(ctx, fmt.Errorf("%v", err))
+				}
+			}
+		}()
+
 		results, err := router.cc.CallWithProvider(matchedRoute.Handle(), provider)
 		if err != nil {
-			return router.exceptionHandler(ctx, err)
+			return router.handleException(ctx, err)
 		}
 
 		return router.parseResponse(ctx, results)
@@ -188,8 +263,8 @@ func (router *Router) handle(ctx Context, matchedRoute Route) {
 		handler = d(handler)
 	}
 
-	if err := handler(ctx).Send(); err != nil {
-		log.Printf("send response failed: %v", err)
+	if err := handler(ctx).Send(); err != nil && router.logger != nil {
+		router.logger.Errorf("send response failed: %v", err)
 	}
 }
 

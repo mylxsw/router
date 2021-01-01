@@ -2,7 +2,6 @@ package web
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -23,13 +22,13 @@ func NewRequestMiddleware() RequestMiddleware {
 }
 
 // AccessLog create a access log middleware
-func (rm RequestMiddleware) AccessLog() HandlerDecorator {
+func (rm RequestMiddleware) AccessLog(logger Log) HandlerDecorator {
 	return func(handler Handler) Handler {
 		return func(ctx Context) Response {
 			startTs := time.Now()
 			resp := handler(ctx)
 
-			log.Printf(
+			logger.Debugf(
 				"%s %s [%d] [%.4fms]",
 				ctx.Method(),
 				ctx.Request().Raw().URL.String(),
@@ -42,6 +41,7 @@ func (rm RequestMiddleware) AccessLog() HandlerDecorator {
 	}
 }
 
+// CustomAccessLog is a access log object
 type CustomAccessLog struct {
 	Context      Context       `json:"-"`
 	Method       string        `json:"method"`

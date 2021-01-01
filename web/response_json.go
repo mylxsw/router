@@ -33,16 +33,23 @@ func (resp *JSONResponse) WithCode(code int) *JSONResponse {
 
 // Send create response
 func (resp *JSONResponse) Send() error {
-	res, err := json.Marshal(resp.original)
-	if err != nil {
-		err = fmt.Errorf("json encode failed: %v [%v]", err, resp.original)
+	switch resp.original.(type) {
+	case []byte:
+		resp.response.SetContent(resp.original.([]byte))
+	case string:
+		resp.response.SetContent([]byte(resp.original.(string)))
+	default:
+		res, err := json.Marshal(resp.original)
+		if err != nil {
+			err = fmt.Errorf("json encode failed: %v [%v]", err, resp.original)
 
-		return err
+			return err
+		}
+		resp.response.SetContent(res)
 	}
 
 	resp.response.SetCode(resp.code)
 	resp.response.Header("Content-Type", "application/json; charset=utf-8")
-	resp.response.SetContent(res)
 
 	resp.response.Flush()
 	return nil

@@ -31,7 +31,12 @@ type httpRequest struct {
 	pathVars   map[string]string
 }
 
+// NewRequest create new Request
 func NewRequest(cc container.Container, conf *Config, r *http.Request, pathVars map[string]string) Request {
+	if pathVars == nil {
+		pathVars = make(map[string]string)
+	}
+
 	return &httpRequest{
 		r:        r,
 		body:     nil,
